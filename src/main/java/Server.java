@@ -1,13 +1,18 @@
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 class Server {
     private static final int PORT = 9999;
@@ -53,13 +58,22 @@ class Server {
             }
 
             final var method = parts[0];
-            final var path = parts[1];
+            final var fullPath = parts[1];
+
+            // Извлекаем путь и параметры из Query String
+            final var index = fullPath.indexOf('?');
+            final var path = index != -1 ? fullPath.substring(0, index) : fullPath;
+            final var queryString = index != -1 ? fullPath.substring(index + 1) : "";
+
+            final var queryParams = URLEncodedUtils.parse(queryString, StandardCharsets.UTF_8)
+                    .stream()
+                    .collect(Collectors.toMap(NameValuePair::getName, NameValuePair::getValue));
 
             final var handlerMap = handlers.get(method);
             if (handlerMap != null) {
                 final var handler = handlerMap.get(path);
                 if (handler != null) {
-                    handler.handle(new Request(method, path, in), out);
+                    handler.handle(new Request(method, path, in, queryParams), out);
                     return;
                 }
             }
