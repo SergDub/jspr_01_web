@@ -1,28 +1,32 @@
-
-
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-public class Server {
+
+class Server {
     private static final int PORT = 9999;
     private static final int THREAD_POOL_SIZE = 64;
-    private final List<String> validPaths;
+    private final Map<String, Map<String, Handler>> handlers;
     private final ExecutorService executor;
 
-    public Server(List<String> validPaths) {
-        this.validPaths = validPaths;
+    public Server() {
+        //    this.validPaths = validPaths;
+        this.handlers = new HashMap<>();
         this.executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
-
     }
 
-    public void start() {
-        try (final var serverSocket = new ServerSocket(PORT)) {
+    public void addHandler(String method, String path, Handler handler) {
+        handlers.computeIfAbsent(method, k -> new HashMap<>()).put(path, handler);
+    }
+
+    public void listen(int port) {
+        try (final var serverSocket = new ServerSocket(port)) {
             while (true) {
                 try {
                     final var socket = serverSocket.accept();
@@ -48,50 +52,29 @@ public class Server {
                 return;
             }
 
+            final var method = parts[0];
             final var path = parts[1];
-            if (!validPaths.contains(path)) {
-                out.write((
-                        "HTTP/1.1 404 Not Found\r\n" +
-                                "Content-Length: 0\r\n" +
-                                "Connection: close\r\n" +
-                                "\r\n"
-                ).getBytes());
-                out.flush();
-                return;
+
+            final var handlerMap = handlers.get(method);
+            if (handlerMap != null) {
+                final var handler = handlerMap.get(path);
+                if (handler != null) {
+                    handler.handle(new Request(method, path, in), out);
+                    return;
+                }
             }
 
-            final var fillePath = Path.of(".", "public", path);
-            final var mimeType = Files.probeContentType(fillePath);
-
-            if (path.equals("/classic.html")) {
-                final var template = Files.readString(fillePath);
-                final var content = template.replace(
-                        "{time}",
-                        LocalDateTime.now().toString()
-                ).getBytes();
-                out.write((
-                        "HTTP/1.1 200 OK\r\n" +
-                                "Content-Type: " + mimeType + "\r\n" +
-                                "Content-Length: " + content.length + "\r\n" +
-                                "Connection: close\r\n" +
-                                "\r\n"
-                ).getBytes());
-                out.write(content);
-                out.flush();
-            } else {
-                final var length = Files.size(fillePath);
-                out.write((
-                        "HTTP/1.1 200 OK\r\n" +
-                                "Content-Type: " + mimeType + "\r\n" +
-                                "Content-Length: " + length + "\r\n" +
-                                "Connection: close\r\n" +
-                                "\r\n"
-                ).getBytes());
-                Files.copy(fillePath, out);
-                out.flush();
-            }
+            // Если не нашли обработчик, то возвращаем 404 Not Found
+            out.write((
+                    "HTTP/1.1 404 Not Found\r\n" +
+                            "Content-Length: 0\r\n" +
+                            "Connection: close\r\n" +
+                            "\r\n"
+            ).getBytes());
+            out.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 }
+

@@ -1,11 +1,41 @@
+import java.io.BufferedOutputStream;
+import java.io.IOException;
 
 
-import java.util.List;
-
-public class Main{
+public class Main {
     public static void main(String[] args) {
-        final var validPaths = List.of("/index.html", "/spring.svg", "/spring.png", "/resources.html", "styles.css", "/app.js", "/links.html", "/forms.html", "/classic.html", "/events.html", "/events.js");
-        final var server = new Server(validPaths);
-        server.start();
+        final var server = new Server();
+
+        // Добавление обработчиков
+        server.addHandler("GET", "/messages", new Handler() {
+            public void handle(Request request, BufferedOutputStream responseStream) throws IOException {
+                // TODO: Обработка GET запроса на путь "/messages"
+                String responseBody = "Hello from GET request";
+                writeResponse(responseStream, responseBody);
+            }
+        });
+
+        server.addHandler("POST", "/messages", new Handler() {
+            public void handle(Request request, BufferedOutputStream responseStream) throws IOException {
+                // TODO: Обработка POST запроса на путь "/messages"
+                String responseBody = "Hello from POST ";
+                writeResponse(responseStream, responseBody);
+            }
+        });
+
+        server.listen(9999);
+    }
+
+    private static void writeResponse(BufferedOutputStream responseStream, String responseBody) throws IOException {
+        byte[] content = responseBody.getBytes();
+        responseStream.write((
+                "HTTP/1.1 200 OK\r\n" +
+                        "Content-Type: text/plain\r\n" +
+                        "Content-Length: " + content.length + "\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        responseStream.write(content);
+        responseStream.flush();
     }
 }
