@@ -10,7 +10,8 @@ public class Main {
         server.addHandler("GET", "/messages", new Handler() {
             public void handle(Request request, BufferedOutputStream responseStream) throws IOException {
                 // TODO: Обработка GET запроса на путь "/messages"
-                String responseBody = "Hello from GET request";
+                String lastParam = request.getQueryParam("last");
+                String responseBody = "Hello from GET request with last param: " + lastParam;
                 writeResponse(responseStream, responseBody);
             }
         });
